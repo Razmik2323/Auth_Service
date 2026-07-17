@@ -1,0 +1,41 @@
+services:
+  db-test:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: auth
+      POSTGRES_PASSWORD: auth
+      POSTGRES_DB: auth_test
+    tmpfs:
+      - /var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U auth -d auth_test"]
+      interval: 2s
+      timeout: 3s
+      retries: 20
+
+  redis-test:
+    image: redis:7-alpine
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 2s
+      timeout: 3s
+      retries: 20
+
+  tests:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+      target: dev
+    environment:
+      APP_ENV: test
+      DATABASE_URL: postgresql+asyncpg://auth:auth@db-test:5432/auth_test
+      REDIS_URL: redis://redis-test:6379/0
+      RATE_LIMIT_ENABLED: "false"
+    depends_on:
+      db-test:
+        condition: service_healthy
+      redis-test:
+        condition: service_healthy
+    volumes:
+      - ./alembic/versions:/app/alembic/versions
+    command: sh -c "uv run alembic upgrade head && uv run alembic check && uv run ruff check . && uv run ruff format --check . && uv run mypy app && uv run pytest -q"

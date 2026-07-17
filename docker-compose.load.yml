@@ -1,0 +1,23 @@
+services:
+  api:
+    environment:
+      LOG_LEVEL: WARNING
+      RATE_LIMIT_ENABLED: "false"
+      GUNICORN_WORKERS: 6
+      DB_POOL_SIZE: 10
+      DB_MAX_OVERFLOW: 5
+
+  k6:
+    image: grafana/k6:latest
+    volumes:
+      - ./loadtest:/scripts:ro
+    environment:
+      BASE_URL: http://api:8000
+      RATE: "1000"
+      DURATION: 30s
+      VUS: "200"
+      MAX_VUS: "1000"
+    depends_on:
+      api:
+        condition: service_healthy
+    command: run /scripts/users_me.js
